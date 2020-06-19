@@ -1,0 +1,22 @@
+---
+layout: default
+toc_nav_id: toc-nav
+---
+
+
+{%- if page.use_toc -%}
+    <div class="row">
+        <main class="col-xl-9">
+            <h2>Contents</h2>
+            {% include toc.html html=content %}
+            {{ content }}
+        </main>
+
+        <nav class="d-none d-xl-block col-xl-3 toc-nav" id="{{ layout.toc_nav_id }}">
+            <h5 class="toc-nav-title">Contents</h5>
+            {% include toc.html html=content class="nav" anchor_class="nav-link" %}
+        </nav>
+    </div>
+{%- else -%}
+    {{ content }}
+{%- endif -%}

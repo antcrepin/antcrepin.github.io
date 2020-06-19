@@ -1,0 +1,85 @@
+---
+layout: compress
+---
+
+<!DOCTYPE html>
+<html lang="{{ site.lang | default: 'en-US' }}">
+<head>
+  <meta charset="UTF-8">
+  <title>{% if page.title %}{{ page.title }} | {% endif %}{{ site.title }}</title>
+  <meta name="description" content="{{ page.description | default: site.description }}"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Required CSS: Bootstrap, custom CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+  <link rel="stylesheet" href="{{ site.baseurl }}/css/website.css">
+
+  {%- if page.use_fontawesome -%}
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.2/css/all.css" integrity="sha384-oS3vJWv+0UjzBfQzYUhtDYW+Pj2yciDJxpsK1OYPAYjqT085Qq/1cq5FLXAZQ7Ay" crossorigin="anonymous">
+  {%- endif -%}
+
+  {%- if page.use_code -%}
+    <link rel="stylesheet" href="{{ site.baseurl }}/css/rouge-github.css">
+  {%- endif -%}
+
+  {%- if page.use_math -%}
+    <script type="text/javascript">
+      window.MathJax = {
+        tex: {
+          macros: {
+            E: "{\\mathbb{E}}",
+            R: "{\\mathbb{R}}",
+          },
+        },
+        options: {
+          renderActions: {
+            findScript: [9, function (doc) {
+              for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+                const display = !!node.type.match(/; *mode=display/);
+                const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+                const text = document.createTextNode('');
+                node.parentNode.replaceChild(text, node);
+                math.start = {node: text, delim: '', n: 0};
+                math.end = {node: text, delim: '', n: 0};
+                doc.math.push(math);
+              }
+              doc.findMath();
+            }, '']
+          }
+        }
+      };
+    </script>
+    <script type="text/javascript" async
+      src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js">
+    </script>
+  {%- endif -%}
+
+  {% include analytics.html %}
+</head>
+
+{%- if layout.toc_nav_id -%}
+<body data-spy="scroll" data-target="#{{ layout.toc_nav_id }}">
+{%- else -%}
+<body>
+{%- endif -%}
+  	<div class="flex-wrapper">
+	  <div>
+		{% include navbar.html %}
+  		{% include header.html %}
+  		<div class="container">
+    		{{ content }}
+  		</div>
+	  </div>
+	  {% include footer.html %}
+	</div>
+<!-- jQuery: necessary for Bootstrap's JavaScript plugins -->
+<!-- Popper.js: required for Bootstrap tooltips -->
+<!-- Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+</body>
+
+<link rel="shortcut icon" type="image/svg" href="/favicon.svg">
+
+</html>

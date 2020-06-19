@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="UTF-8">
+  <title>A route optimizer for the Breitling 100/24 race | Antoine Crépin</title>
+  <meta name="description" content="ENSTA Paris - Air France"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Required CSS: Bootstrap, custom CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+  <link rel="stylesheet" href="/css/website.css"><link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.2/css/all.css" integrity="sha384-oS3vJWv+0UjzBfQzYUhtDYW+Pj2yciDJxpsK1OYPAYjqT085Qq/1cq5FLXAZQ7Ay" crossorigin="anonymous"><link rel="stylesheet" href="/css/rouge-github.css"><script type="text/javascript">
+      window.MathJax = {
+        tex: {
+          macros: {
+            E: "{\\mathbb{E}}",
+            R: "{\\mathbb{R}}",
+          },
+        },
+        options: {
+          renderActions: {
+            findScript: [9, function (doc) {
+              for (const node of document.querySelectorAll('script[type^="math/tex"]')) {
+                const display = !!node.type.match(/; *mode=display/);
+                const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+                const text = document.createTextNode('');
+                node.parentNode.replaceChild(text, node);
+                math.start = {node: text, delim: '', n: 0};
+                math.end = {node: text, delim: '', n: 0};
+                doc.math.push(math);
+              }
+              doc.findMath();
+            }, '']
+          }
+        }
+      };
+    </script>
+    <script type="text/javascript" async
+      src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js">
+    </script><script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+  ga('create', 'UA-105585325-1', 'auto');
+  ga('send', 'pageview');
+</script>
+</head><body data-spy="scroll" data-target="#toc-nav"><div class="flex-wrapper">
+	  <div>
+		<div class="container">
+  <nav class="navbar navbar-expand-md navbar-light bg-white">
+    <a class="navbar-brand" href="/">Antoine Crépin</a><button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav mr-auto"><li class="nav-item">
+              <a class="nav-link" href="/projects">Projects</a>
+            </li></ul>
+    </div></nav>
+</div>
+  		<div class="jumbotron jumbotron-fluid header header-page">
+  <div class="container">
+    <h1>A route optimizer for the Breitling 100/24 race</h1>
+    <h2></h2>
+  </div>
+</div>
+  		<div class="container">
+    		<div class="row">
+        <main class="col-xl-9">
+            <h2>Contents</h2>
+            <ul>
+  <li><a href="#introduction">Introduction</a></li>
+  <li><a href="#notations">Notations</a>
+    <ul>
+      <li><a href="#parameters">Parameters</a></li>
+      <li><a href="#decision-variables">Decision variables</a></li>
+    </ul>
+  </li>
+  <li><a href="#mathematical-modeling">Mathematical modeling</a>
+    <ul>
+      <li><a href="#optimization-graph">Optimization graph</a></li>
+      <li><a href="#objective">Objective</a></li>
+      <li><a href="#constraints">Constraints</a></li>
+      <li><a href="#connectivity-constraint">Connectivity constraint</a></li>
+    </ul>
+  </li>
+  <li><a href="#method-1-order-of-visit">Method 1: order of visit</a></li>
+  <li><a href="#method-2-single-flow">Method 2: single flow</a>
+    <ul>
+      <li><a href="#benefit">Benefit</a></li>
+    </ul>
+  </li>
+  <li><a href="#method-3-standard-constraint-generation">Method 3: standard constraint generation</a>
+    <ul>
+      <li><a href="#master-problem">Master problem</a></li>
+      <li><a href="#subtour-detection-subproblem">Subtour detection subproblem</a></li>
+    </ul>
+  </li>
+  <li><a href="#method-4-advanced-constraint-generation">Method 4: advanced constraint generation</a>
+    <ul>
+      <li><a href="#master-problem-1">Master problem</a></li>
+      <li><a href="#subtour-detection-subproblem-1">Subtour detection subproblem</a></li>
+    </ul>
+  </li>
+  <li><a href="#performance">Performance</a></li>
+  <li><a href="#instances">Instances</a></li>
+</ul>
+            <p><br /></p>
+<h2 id="introduction">Introduction</h2>
+<hr />
+<p class="centered">
+    <img src="/images/flight-route-optimizer/breitling.jpg" style="width: 50%" />
+</p>
+<div class="justified">
+    <p><span class="font-weight-bold">Abstract:</span> In the late 2000s, early 2010s, the watch manufacturing company Breitling organized airplane racing competitions in France every year. In order to win, a participant had to complete 100 “touch-and-go” maneuvers in distinct airdromes in a 24-hour timeframe by traveling a shorter distance than its competitors. Groups of airdromes are predefined and each group must be visited at least once to ensure some geographical diversity. The length of a stage must not exceed a certain maximum threshold distance based on the average fuel consumption of a plane and the capacity of its tank. We consider a simplified version of the problem where the time component is ignored (variant of the Traveling Salesman Problem). We consider four methods to solve the problem.</p>
+    <p><span class="font-weight-bold">Keywords:</span> branch-and-bound, dynamic constraint generation, LP relaxation, MILP, total unimodularity, Traveling Salesman Problem (TSP)</p>
+	<p><span class="font-weight-bold">Programming language:</span> Julia</p>
+    <a href="https://github.com/antcrepin/flight-route-optimizer" class="btn btn-light">
+        <i class="fab fa-github"></i> Repo
+    </a>
+</div>
+<p><br /></p>
+<h2 id="notations">Notations</h2>
+<hr />
+<h3 id="parameters">Parameters</h3>
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: center">Parameter</th>
+      <th style="text-align: center">Domain</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">n</script></td>
+      <td style="text-align: center"><script type="math/tex">\mathbb{N}^*</script></td>
+      <td>total number of airdromes, labeled <script type="math/tex">1,\dots,n</script></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">I</script></td>
+      <td style="text-align: center"><script type="math/tex">[\![1,n]\!]</script></td>
+      <td>departure airdrome</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">F</script></td>
+      <td style="text-align: center"><script type="math/tex">[\![1,n]\!]</script></td>
+      <td>arrival airdrome</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">k</script></td>
+      <td style="text-align: center"><script type="math/tex">[\![1,n]\!]</script></td>
+      <td>minimum number of airdromes to be visited</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">m</script></td>
+      <td style="text-align: center"><script type="math/tex">\mathbb{N}</script></td>
+      <td>total number of groups, labeled <script type="math/tex">1,\dots,m</script></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">R_i,\ i\in[\![1,n]\!]</script></td>
+      <td style="text-align: center"><script type="math/tex">[\![0,m]\!]</script></td>
+      <td>group of the airdrome <script type="math/tex">i</script>, equals 0 if the airdrome does not belong to any group</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">D_{ij},\ (i,j)\in[\![1,n]\!]^2</script></td>
+      <td style="text-align: center"><script type="math/tex">\mathbb{N}</script></td>
+      <td><strong>rounded</strong> distance between the airdromes <script type="math/tex">i</script> and <script type="math/tex">j</script></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\Delta</script></td>
+      <td style="text-align: center"><script type="math/tex">\mathbb{N}^*</script></td>
+      <td>maximum distance that can be traveled without landing to refuel</td>
+    </tr>
+  </tbody>
+</table>
+<p><br /></p>
+<h3 id="decision-variables">Decision variables</h3>
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: center">Decision variable</th>
+      <th style="text-align: center">Domain</th>
+      <th>Description</th>
+      <th style="text-align: center">Used in model(s)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">x_{ij},\ (i,j)\in[\![1,n]\!]^2</script></td>
+      <td style="text-align: center"><script type="math/tex">\{0,1\}</script></td>
+      <td><script type="math/tex">x_{ij}</script> equals 1 if the plane directly goes from <script type="math/tex">i</script> to <script type="math/tex">j</script>, 0 otherwise</td>
+      <td style="text-align: center">1, 2, 3, 4</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">u_i,\ i\in[\![1,n]\!]</script></td>
+      <td style="text-align: center"><script type="math/tex">\mathbb{R_+}</script></td>
+      <td>order of the airdrome <script type="math/tex">i</script> such that the airdromes are visited with <script type="math/tex">u</script> increasing</td>
+      <td style="text-align: center">1</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">q_{ij},\ (i,j)\in[\![1,n]\!]^2</script></td>
+      <td style="text-align: center"><script type="math/tex">\mathbb{R_+}</script></td>
+      <td>flow circulating from the airdrome <script type="math/tex">i</script> to the airdrome <script type="math/tex">j</script></td>
+      <td style="text-align: center">2</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\phi_i,\ i\in[\![1,n]\!]</script></td>
+      <td style="text-align: center"><script type="math/tex">\{0,1\}</script></td>
+      <td>flow consumption at the airdrome <script type="math/tex">i</script></td>
+      <td style="text-align: center">2</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">z_i,\ i\in[\![1,n]\!]</script></td>
+      <td style="text-align: center"><script type="math/tex">\{0,1\}</script></td>
+      <td><script type="math/tex">z_i</script> equals 1 if the airdrome <script type="math/tex">i</script> is part of the selected subset, 0 otherwise</td>
+      <td style="text-align: center">3, 4</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">y_{ij},\ (i,j)\in[\![1,n]\!]^2</script></td>
+      <td style="text-align: center"><script type="math/tex">\mathbb{R_+}</script></td>
+      <td><script type="math/tex">y_{ij}</script> equals 1 if both airdromes <script type="math/tex">i</script> and <script type="math/tex">j</script> are both parts of the selected subset, 0 otherwise<br /><script type="math/tex">y_{ij}</script> simulates <script type="math/tex">z_iz_j</script></td>
+      <td style="text-align: center">3, 4</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">t_i,\ i\in[\![1,n]\!]</script></td>
+      <td style="text-align: center"><script type="math/tex">\{0,1\}</script></td>
+      <td><script type="math/tex">t_i</script> equals 1 if the airdrome <script type="math/tex">i</script> is visited by the plane, 0 otherwise</td>
+      <td style="text-align: center">4</td>
+    </tr>
+  </tbody>
+</table>
+<p><br /></p>
+<h2 id="mathematical-modeling">Mathematical modeling</h2>
+<hr />
+<h3 id="optimization-graph">Optimization graph</h3>
+<p>We consider the directed optimization graph <script type="math/tex">G=(V,A)</script> where <script type="math/tex">V</script> is the set of airdromes and</p>
+<script type="math/tex; mode=display">A = \left\{(i,j)\in[\![1,n]\!]^2\ \text{such that}\ D_{ij}\leqslant\Delta\ \text{and}\ i\neq j\right\}.</script>
+<blockquote>
+  <p>We excluded self-loops and arcs whose length exceeds the threshold distance <script type="math/tex">\Delta</script>.</p>
+</blockquote>
+<p><br /></p>
+<h3 id="objective">Objective</h3>
+<p>The problem aims at <strong>minimizing the total traveled distance</strong> which can be expressed as follows:</p>
+<script type="math/tex; mode=display">\sum_{i,j}{D_{ij}x_{ij}}.</script>
+<p><br /></p>
+<h3 id="constraints">Constraints</h3>
+<ul>
+  <li>
+    <p>Each airdrome can be visited by the plane at most once, <em>i.e.</em>, there is at most one landing and one takeoff:</p>
+    <script type="math/tex; mode=display">\sum_j{x_{ij}}+ \sum_j{x_{ji}} \leqslant 2\quad \forall i\in[\![ 1, n]\!].</script>
+  </li>
+  <li>
+    <p>The plane starts its route at <script type="math/tex">I</script> and ends at <script type="math/tex">F</script>. For every other airdrome, the plane completes a “touch-and-go” maneuver so there are as many landings as takeoffs:</p>
+    <script type="math/tex; mode=display">\sum_j{x_{ij}}-\sum_j{x_{ji}} = \delta_{iI}-\delta_{iF}\quad  \forall i\in[\![ 1, n]\!],</script>
+    <p>where <script type="math/tex">\delta</script> is the Kronecker delta.</p>
+  </li>
+  <li>
+    <p>It is easy to see that an optimal solution for this problem does not contain any cycle, so the selected arcs have a <strong>tree structure</strong> (the number of visited airdromes exceeds the number of selected arcs by one unit). The plane must visit at least <script type="math/tex">k</script> airdromes:</p>
+    <script type="math/tex; mode=display">\sum_{i,j}{x_{ij}} \geqslant k-1.</script>
+  </li>
+  <li>
+    <p>Each predefined group of airdromes must be visited at least once:</p>
+    <script type="math/tex; mode=display">\sum_{i,j:\ R_i=r\ \text{or}\ R_j=r}{x_{ij}} \geqslant 1\quad\forall r\in [\![ 1, m]\!].</script>
+  </li>
+</ul>
+<p><br /></p>
+<h3 id="connectivity-constraint">Connectivity constraint</h3>
+<p>At this point the connectivity of the solution is not guaranteed. The set of selected arcs can contain several connected components, one of which is a tree and all the others are cycles called <strong>subtours</strong>.</p>
+<blockquote>
+  <p>There are <strong>several possible formulations</strong> for the subtour elimination constraint.</p>
+</blockquote>
+<p><br /></p>
+<h2 id="method-1-order-of-visit">Method 1: order of visit</h2>
+<hr />
+<p>It is possible to <strong>avoid subtours by labeling the airdromes with respect to their order of visit</strong>. Using the decision variables <script type="math/tex">u</script>, we can force the plane to visit the airdromes with <script type="math/tex">u</script> increasing:</p>
+<script type="math/tex; mode=display">u_j - u_i + n(1-x_{ij}) \geqslant 1\quad \forall (i,j)\in A.</script>
+<p>Thus we obtain a <strong>first formulation</strong> of the problem with <script type="math/tex">\mathcal{O}(n^2)</script> decision variables and <script type="math/tex">\mathcal{O}(n^2)</script> constraints.</p>
+<script type="math/tex; mode=display">% <![CDATA[
+\tag{$F1$}
+\label{F1}
+\left\{
+\begin{aligned}
+    \text{minimize} && \sum_{i,j}{D_{ij}x_{ij}} \\
+    \text{subject to} && \sum_{i,j}{x_{ij}} &\geqslant& k-1 \\
+    && \sum_{i,j:\ R_i=r\ \text{or}\ R_j=r}{x_{ij}} &\geqslant& 1 && \forall r\in [\![ 1, m]\!]\\
+    && \sum_j{x_{ij}}+ \sum_j{x_{ji}} &\leqslant& 2 && \forall i\in[\![ 1, n]\!] \\
+    && \sum_j{x_{ij}}-\sum_j{x_{ji}} &=& \delta_{iI}-\delta_{iF} && \forall i\in[\![ 1, n]\!] \\
+    && u_j - u_i + n(1-x_{ij}) &\geqslant& 1 && \forall (i,j)\in A \\
+    && u_i &\geqslant& 0 && \forall i\in[\![ 1, n]\!]\\
+    && x_{ij} &\in& \{0,1\} && \forall (i,j)\in A
+\end{aligned}
+\right. %]]></script>
+<p>\eqref{F1} is solved thanks to a solver like CPLEX Optimizer or <a href="https://projects.coin-or.org/Cbc">CBC</a>. These solvers use the <strong>branch-and-bound algorithm whose performance is highly dependent on the ability to find good-quality bounds</strong> (lower bounds here) by solving LP relaxations at each visited node of the search tree.</p>
+<p>For the smallest instances, the following table compares the optimal value to the lower bound corresponding to the LP relaxation at the root of the search tree.</p>
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: center">Instance</th>
+      <th style="text-align: center">Optimal value</th>
+      <th style="text-align: center">Root node lower bound</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n6}</script></td>
+      <td style="text-align: center">12</td>
+      <td style="text-align: center">7.00</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n20_1}</script></td>
+      <td style="text-align: center">91</td>
+      <td style="text-align: center">34.40</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n20_2}</script></td>
+      <td style="text-align: center">79</td>
+      <td style="text-align: center">56.00</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n20_3}</script></td>
+      <td style="text-align: center">90</td>
+      <td style="text-align: center">56.00</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n20_4}</script></td>
+      <td style="text-align: center">96</td>
+      <td style="text-align: center">38.20</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n30}</script></td>
+      <td style="text-align: center">130</td>
+      <td style="text-align: center">54.60</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n40}</script></td>
+      <td style="text-align: center">114</td>
+      <td style="text-align: center">77.25</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n50}</script></td>
+      <td style="text-align: center">168</td>
+      <td style="text-align: center">93.24</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n70}</script></td>
+      <td style="text-align: center">235</td>
+      <td style="text-align: center">97.81</td>
+    </tr>
+  </tbody>
+</table>
+<blockquote>
+  <p>The lower bounds we obtain from this formulation are not very sharp.</p>
+</blockquote>
+<p><br /></p>
+<h2 id="method-2-single-flow">Method 2: single flow</h2>
+<hr />
+<p><a href="https://dspace.mit.edu/handle/1721.1/5363">Gavish and Graves (1978)</a> gave a formulation for the subtour elimination constraints that significantly improves the quality of the relaxation while keeping a polynomial number of constraints. The methods consists in using <strong>artificial flow variables</strong> (<script type="math/tex">q</script> and <script type="math/tex">\phi</script> here).</p>
+<p>We obtain a <strong>second formulation</strong> of the problem with <script type="math/tex">\mathcal{O}(n^2)</script> decision variables and <script type="math/tex">\mathcal{O}(n^2)</script> constraints.</p>
+<script type="math/tex; mode=display">% <![CDATA[
+\tag{$F2$}
+\label{F2}
+\left\{
+\begin{aligned}
+    \text{minimize} && \sum_{i,j}{D_{ij}x_{ij}} \\
+    \text{subject to} && \sum_{i,j}{x_{ij}} &\geqslant& k-1 \\
+    && \sum_{i,j:\ R_i=r\ \text{or}\ R_j=r}{x_{ij}} &\geqslant& 1 && \forall r\in [\![ 1, m]\!]\\
+    && \sum_j{x_{ij}}+ \sum_j{x_{ji}} &\leqslant& 2 && \forall i\in[\![ 1, n]\!] \\
+    && \sum_j{x_{ij}}-\sum_j{x_{ji}} &=& \delta_{iI}-\delta_{iF} && \forall i\in[\![ 1, n]\!] \\
+    && (n-1)x_{ij} - q_{ij} &\geqslant& 0 && \forall (i,j)\in A \\
+	&& \sum_i{q_{Ii}} - \sum_i{\phi_i} &=& 0 \\
+	&& \sum_j{q_{ij}}-\sum_j{q_{ji}} - \phi_i &=& 0 && \forall i\in[\![ 1, n]\!] \\
+	&& \sum_j{x_{ji}} - \phi_i &=& 0 && \forall i\in[\![ 1, n]\!] \\
+	&& q_{ij} &\geqslant& 0 && \forall (i,j)\in A\\
+    && x_{ij} &\in& \{0,1\} && \forall (i,j)\in A\\
+	&& \phi_i &\in& \{0,1\} && \forall i\in[\![ 1, n]\!]
+\end{aligned}
+\right. %]]></script>
+<p><br /></p>
+<h3 id="benefit">Benefit</h3>
+<blockquote>
+  <p>Intuitively we can expect the lower bounds provided by \eqref{F2} to be tighter that the ones from \eqref{F1}.</p>
+</blockquote>
+<p>In \eqref{F2}, even if the variables <script type="math/tex">x_{ij}</script> are not integer, we will have <script type="math/tex">\sum_j{x_{ji}} = \phi_i > 0</script> as soon as the airdrome <script type="math/tex">i</script> is in the selected route. Then,</p>
+<script type="math/tex; mode=display">% <![CDATA[
+\sum_j{q_{ji}} = \sum_j{q_{ij}}-\phi_i < \sum_j{q_{ij}}. %]]></script>
+<p>Hence <strong>cycles are also excluded from the solution of the LP relaxation</strong>. That was not necessarily the case in \eqref{F1}.</p>
+<p>For the first instances, we compare the optimal value to the lower bound obtained from the LP relaxation of \eqref{F2}.</p>
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: center">Instance</th>
+      <th style="text-align: center">Optimal value</th>
+      <th style="text-align: center">Root node lower bound</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n6}</script></td>
+      <td style="text-align: center">12</td>
+      <td style="text-align: center">7.96</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n20_1}</script></td>
+      <td style="text-align: center">91</td>
+      <td style="text-align: center">44.23</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n20_2}</script></td>
+      <td style="text-align: center">79</td>
+      <td style="text-align: center">57.03</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n20_3}</script></td>
+      <td style="text-align: center">90</td>
+      <td style="text-align: center">57.03</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n20_4}</script></td>
+      <td style="text-align: center">96</td>
+      <td style="text-align: center">49.39</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n30}</script></td>
+      <td style="text-align: center">130</td>
+      <td style="text-align: center">65.90</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n40}</script></td>
+      <td style="text-align: center">114</td>
+      <td style="text-align: center">82.17</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n50}</script></td>
+      <td style="text-align: center">168</td>
+      <td style="text-align: center">108.10</td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n70}</script></td>
+      <td style="text-align: center">235</td>
+      <td style="text-align: center">114.74</td>
+    </tr>
+  </tbody>
+</table>
+<p>As expected, the lower bounds we obtain from this formulation are sharper than the ones from \eqref{F1}.</p>
+<blockquote>
+  <p>The branch-and-bound algorithm should perform better with \eqref{F2}.</p>
+</blockquote>
+<p><br /></p>
+<h2 id="method-3-standard-constraint-generation">Method 3: standard constraint generation</h2>
+<hr />
+<p>The absence of subtours can also be expressed by the fact that <strong>each subset of airdromes must not contain any subtour</strong>:</p>
+<script type="math/tex; mode=display">\sum_{(i,j)\in S^2}{x_{ij}}\leqslant |S|-1\quad \forall S\subset[\![1,n]\!],\ |S|\geqslant2.</script>
+<p>We obtain a <strong>third formulation</strong> of the problem with <script type="math/tex">\mathcal{O}(n^2)</script> decision variables and <script type="math/tex">\mathcal{O}(2^n)</script> constraints.</p>
+<script type="math/tex; mode=display">% <![CDATA[
+\tag{$F3$}
+\label{F3}
+\left\{
+\begin{aligned}
+    \text{minimize} && \sum_{i,j}{D_{ij}x_{ij}} \\
+    \text{subject to} && \sum_{i,j}{x_{ij}} &\geqslant& k-1 \\
+    && \sum_{i,j:\ R_i=r\ \text{or}\ R_j=r}{x_{ij}} &\geqslant& 1 && \forall r\in [\![ 1, m]\!]\\
+    && \sum_j{x_{ij}}+ \sum_j{x_{ji}} &\leqslant& 2 && \forall i\in[\![ 1, n]\!] \\
+    && \sum_j{x_{ij}}-\sum_j{x_{ji}} &=& \delta_{iI}-\delta_{iF} && \forall i\in[\![ 1, n]\!] \\
+    && \sum_{(i,j)\in S^2}{x_{ij}} &\leqslant& |S|-1 && \forall S\subset[\![1,n]\!]\\
+    && x_{ij} &\in& \{0,1\} && \forall (i,j)\in A
+\end{aligned}
+\right. %]]></script>
+<p>Unlike the previous formulations, \eqref{F3} contains an exponential number of constraints, therefore solving it as it stands is not an option. For example the case <script type="math/tex">n=20</script> would lead to more than <script type="math/tex">2^{20}\simeq 10^6</script> constraints to generate.</p>
+<blockquote>
+  <p>To overcome this difficulty we consider another course of action. The subtour elimination constraints will be <strong>generated dynamically</strong>.</p>
+</blockquote>
+<ul>
+  <li>We start by solving the model without any subtour elimination constraint.</li>
+  <li>Then we detect the subtours in the solution and add the corresponding constraints to the model (a subtour is fully characterized by the set <script type="math/tex">S</script> of airdromes that are involved) and solve it again.</li>
+  <li>We <strong>repeat these steps until the solution contains no subtour</strong>.</li>
+</ul>
+<p><br /></p>
+<h3 id="master-problem">Master problem</h3>
+<p>The current set of identified subtours is denoted by <script type="math/tex">\mathcal{C}</script>. At each iteration we solve the following master problem.</p>
+<script type="math/tex; mode=display">% <![CDATA[
+\tag{$M3$}
+\label{M3}
+\left\{
+\begin{aligned}
+    \text{minimize} && \sum_{i,j}{D_{ij}x_{ij}} \\
+    \text{subject to} && \sum_{i,j}{x_{ij}} &\geqslant& k-1 \\
+    && \sum_{i,j:\ R_i=r\ \text{or}\ R_j=r}{x_{ij}} &\geqslant& 1 && \forall r\in [\![ 1, m]\!]\\
+    && \sum_j{x_{ij}}+ \sum_j{x_{ji}} &\leqslant& 2 && \forall i\in[\![ 1, n]\!] \\
+    && \sum_j{x_{ij}}-\sum_j{x_{ji}} &=& \delta_{iI}-\delta_{iF} && \forall i\in[\![ 1, n]\!] \\
+    && \sum_{(i,j)\in S^2}{x_{ij}} &\leqslant& |S|-1 && \forall S\in\mathcal{C}\\
+    && x_{ij} &\in& \{0,1\} && \forall (i,j)\in A
+\end{aligned}
+\right. %]]></script>
+<p><br /></p>
+<h3 id="subtour-detection-subproblem">Subtour detection subproblem</h3>
+<p>The current solution of \eqref{M3} is denoted by <script type="math/tex">(\tilde{x}_{ij})_{i,j}</script>. We want to identify the subset of airdromes <script type="math/tex">\bar{S}</script> that maximizes the quantity</p>
+<script type="math/tex; mode=display">\sum_{(i,j)\in S^2}{\tilde{x}_{ij}}-|S|+1</script>
+<p>for <script type="math/tex">S\subset[\![1,n]\!]</script>.</p>
+<p>It can be done by using the binary decision variables <script type="math/tex">y</script> and <script type="math/tex">z</script> and considering the following MILP.</p>
+<script type="math/tex; mode=display">% <![CDATA[
+\tag{$S3$}
+\label{S3}
+\left\{
+\begin{aligned}
+    \text{maximize} && \sum_{i,j}{\tilde{x}_{ij}y_{ij}}-\sum_i{z_i}+1 \\
+    \text{subject to} && y_{ij}-z_i &\leqslant& 0 && \forall (i,j)\in A\\
+    && y_{ij}-z_j &\leqslant& 0 && \forall (i,j)\in A\\
+    && y_{ij} &\geqslant& 0 && \forall (i,j)\in A\\
+    && z_i &\in& \{0,1\} && \forall i\in [\![1,n]\!]
+\end{aligned}
+\right. %]]></script>
+<p>The optimal solution of \eqref{S3} is denoted by <script type="math/tex">\left((y_{ij}^*)_{i,j},(z_i^*)_i\right)</script>.</p>
+<ul>
+  <li>
+    <p>If the optimal value of the objective is positive, it means that the subtour constraint is violated for</p>
+    <script type="math/tex; mode=display">\bar{S}=\{i\in[\![1,n]\!]\ \text{such that}\ z_i^*=1\},</script>
+    <p>and we can <strong>add a new constraint</strong> to the master problem: <script type="math/tex">\mathcal{C}\leftarrow\mathcal{C}\cup\bar{S}</script>.</p>
+  </li>
+  <li>
+    <p>Otherwise <script type="math/tex">(\tilde{x}_{ij})_{i,j}</script> has a <strong>tree structure</strong> and is the optimal solution of the initial problem.</p>
+  </li>
+</ul>
+<p><br /></p>
+<h2 id="method-4-advanced-constraint-generation">Method 4: advanced constraint generation</h2>
+<hr />
+<p>Being able to <strong>detect subtours by solving a LP instead of a MILP</strong> would enhance the efficiency of the previous solution method. <a href="https://books.google.fr/books/about/Integer_Programming.html?id=x7RvQgAACAAJ">Wolsey (1998)</a> proposed a way to do this with a reformulation of the problem.</p>
+<p>We slightly modify the problem and now search for a <strong>single cyclical component</strong>. The use of the arc from the arrival airdrome <script type="math/tex">F</script> to the departure airdrome <script type="math/tex">I</script> will be imposed, even if its length exceeds <script type="math/tex">\Delta</script>.</p>
+<blockquote>
+  <p>The optimization graph becomes <script type="math/tex">G'=(V,A')</script> with <script type="math/tex">A'=A\cup\{(F,I)\}</script>.</p>
+</blockquote>
+<ul>
+  <li>
+    <p>We use the binary variables <script type="math/tex">t</script> to express that there are as many landings as takeoffs in every airdrome:</p>
+    <script type="math/tex; mode=display">x_{F,I}=1, \quad\sum_j{x_{ij}}+ \sum_j{x_{ji}} = 2t_i.</script>
+  </li>
+  <li>
+    <p>The connectivity constraint must be reformulated as well since the structure of the solutions has changed. We now want to avoid the subtours that do not contain the departure airdrome <script type="math/tex">I</script>. The formulation we choose is <strong>more demanding</strong> than before. For each subset of airdromes <script type="math/tex">S</script>, the number of selected internal arcs must be lower than the number of selected airdromes is every subset of <script type="math/tex">S</script> with <script type="math/tex">\lvert S\rvert-1</script> elements:</p>
+    <script type="math/tex; mode=display">\sum_{(i,j)\in S^2}{x_{ij}}\leqslant\sum_{i\in S\setminus\{p\}}{t_i}\quad\forall S\subset[\![1,n]\!]\setminus\{I\},\ \forall p\in S.</script>
+  </li>
+</ul>
+<p>The <strong>fourth and final formulation</strong> of the problem contains <script type="math/tex">\mathcal{O}(n^2)</script> decision variables and <script type="math/tex">\mathcal{O}(n2^n)</script> constraints.</p>
+<script type="math/tex; mode=display">% <![CDATA[
+\tag{$F4$}
+\left\{
+\begin{aligned}
+    \text{minimize} && \sum_{i,j}{D_{ij}x_{ij}} \\
+    \text{subject to} && x_{F,I} &=& 1 \\
+    && \sum_j{x_{ij}}+ \sum_j{x_{ji}} - 2t_i &=& 0 && \forall i\in[\![ 1, n]\!]\\
+    && \sum_{i,j}{x_{ij}} &\geqslant& k \\
+    && \sum_{i,j:\ R_i=r\ \text{or}\ R_j=r}{x_{ij}} &\geqslant& 1 && \forall r\in [\![ 1, m]\!]\\
+    && \sum_j{x_{ij}}-\sum_j{x_{ji}} &=& 0 && \forall i\in[\![ 1, n]\!] \\
+    && \sum_{(i,j)\in S^2}{x_{ij}}-\sum_{i\in S\setminus\{p\}}{t_i}&\leqslant&0 && \forall S\subset[\![1,n]\!]\setminus\{I\},\ \forall p\in S\\
+    && t_i &\in& \{0,1\} && \forall i\in[\![ 1, n]\!]\\
+    && x_{ij} &\in& \{0,1\} && \forall (i,j)\in A'
+\end{aligned}
+\right. %]]></script>
+<p>We adopt the <strong>same iterative approach</strong> than before.</p>
+<p><br /></p>
+<h3 id="master-problem-1">Master problem</h3>
+<p>The dynamic set <script type="math/tex">\mathcal{C}</script> now contains the couples <script type="math/tex">(S,p)</script> (with <script type="math/tex">p\in S</script>) that have been detected over the iterations. At each iteration we solve the following master problem.</p>
+<script type="math/tex; mode=display">% <![CDATA[
+\tag{$M4$}
+\label{M4}
+\left\{
+\begin{aligned}
+    \text{minimize} && \sum_{i,j}{D_{ij}x_{ij}} \\
+    \text{subject to} && x_{F,I} &=& 1 \\
+    && \sum_j{x_{ij}}+ \sum_j{x_{ji}} - 2t_i &=& 0 && \forall i\in[\![ 1, n]\!]\\
+    && \sum_{i,j}{x_{ij}} &\geqslant& k \\
+    && \sum_{i,j:\ R_i=r\ \text{or}\ R_j=r}{x_{ij}} &\geqslant& 1 && \forall r\in [\![ 1, m]\!]\\
+    && \sum_j{x_{ij}}-\sum_j{x_{ji}} &=& 0 && \forall i\in[\![ 1, n]\!] \\
+    && \sum_{(i,j)\in S^2:\ i\neq I,j\neq I}{x_{ij}}-\sum_{i\in S\setminus\{p,I\}}{t_i}&\leqslant&0 && \forall (S,p)\in\mathcal{C}\\
+    && t_i &\in& \{0,1\} && \forall i\in[\![ 1, n]\!]\\
+    && x_{ij} &\in& \{0,1\} && \forall (i,j)\in A'
+\end{aligned}
+\right. %]]></script>
+<p><br /></p>
+<h3 id="subtour-detection-subproblem-1">Subtour detection subproblem</h3>
+<p>The current solution of \eqref{M4} is denoted by <script type="math/tex">\left((\tilde{t}_i)_i,(\tilde{x}_{ij})_{i,j}\right)</script>. We want to identify the couple <script type="math/tex">(\bar{S},\bar{p})</script> that maximizes the quantity</p>
+<script type="math/tex; mode=display">\sum_{(i,j)\in S^2}{\tilde{x}_{ij}}-\sum_{i\in S\setminus\{p\}}{\tilde{t}_i}</script>
+<p>for <script type="math/tex">S\subset[\![1,n]\!]\setminus\{I\}</script> and <script type="math/tex">p\in S</script>.</p>
+<blockquote>
+  <p>It is easier to fix <script type="math/tex">p\neq I</script> and search for the corresponding set <script type="math/tex">S</script>.</p>
+</blockquote>
+<p>We use the binary decision variables <script type="math/tex">y</script> and <script type="math/tex">z</script>, and consider the <script type="math/tex">n-1</script> following subproblems.</p>
+<p>For all <script type="math/tex">p\neq I</script>,</p>
+<script type="math/tex; mode=display">% <![CDATA[
+\tag{$S4$}
+\label{S4}
+\left\{
+\begin{aligned}
+    \text{maximize} && \sum_{i\neq I,j\neq I}{\tilde{x}_{ij}y_{ij}}-\sum_{i\notin\{p,I\}}{\tilde{t}_iz_i} \\
+    \text{subject to} && z_p &=& 1 \\
+    && y_{ij}-z_i &\leqslant& 0 && \forall (i,j)\in A'\\
+    && y_{ij}-z_j &\leqslant& 0 && \forall (i,j)\in A'\\
+    && y_{ij} &\geqslant& 0 && \forall (i,j)\in A'\\
+    && z_i &\in& \{0,1\} && \forall i\in [\![1,n]\!]
+\end{aligned}
+\right. %]]></script>
+<blockquote>
+  <p>For a given <script type="math/tex">p\neq I</script>, \eqref{S4} can be solved <strong>exactly</strong> by relaxing the variables <script type="math/tex">z_i</script> because the constraint matrix is <strong>totally unimodular</strong>.</p>
+</blockquote>
+<p>The optimal solution of \eqref{S4} is denoted by <script type="math/tex">\left((y_{ij}^*)_{i,j},(z_i^*)_i\right)</script>.</p>
+<ul>
+  <li>
+    <p>If the optimal value of the objective is positive, it means that the subtour constraint is violated for</p>
+    <script type="math/tex; mode=display">\bar{S}=\{i\in[\![1,n]\!]\ \text{such that}\ z_i^*=1\},</script>
+    <p>and the current <script type="math/tex">p</script>. We can add a new constraint to the master problem: <script type="math/tex">\mathcal{C}\leftarrow\mathcal{C}\cup(\bar{S},\bar{p})</script>.</p>
+  </li>
+  <li>
+    <p>If for all <script type="math/tex">p\neq I</script> the optimal value of the subproblem is negative or null then considering <script type="math/tex">(\tilde{x}_{ij})_{i,j}</script> <strong>after removing the arc <script type="math/tex">(F,I)</script></strong> provides the optimal solution of the initial problem.</p>
+  </li>
+</ul>
+<blockquote>
+  <p>The constraint generation is carried out in <strong>two steps</strong>:</p>
+  <ol>
+    <li>first step based on the LP relaxation of \eqref{M4} and the LP relaxation of \eqref{S4}</li>
+    <li>second step based on \eqref{M4} and the LP relaxation of \eqref{S4}</li>
+  </ol>
+</blockquote>
+<p><br /></p>
+<h2 id="performance">Performance</h2>
+<hr />
+<p>Method 2 proves to be the most effective method among the ones considered here. It is based on a formulation with a polynomial number of constraints, so we only need to solve a MILP, which is a great advantage. Conversely, the method 1 cannot solve the largest instances in a reasonable amount of time.</p>
+<p>Method 4 allows us to solve all the instances as well, but based on an iterative process (constraint generation). Constraints can be generated by solving LPs instead of MILPs, which is an improvement to method 3.</p>
+<blockquote>
+  <p>This variant of the Traveling Salesman Problem shows the <strong>interest of exploring different approaches</strong> when addressing an optimization problem. Here, the least intuitive methods (2 and 4) appear to be the most efficience.</p>
+</blockquote>
+<p><br /></p>
+<h2 id="instances">Instances</h2>
+<hr />
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: center">Name</th>
+      <th style="text-align: center"><script type="math/tex">n</script></th>
+      <th style="text-align: center"><script type="math/tex">I</script></th>
+      <th style="text-align: center"><script type="math/tex">F</script></th>
+      <th style="text-align: center"><script type="math/tex">k</script></th>
+      <th style="text-align: center"><script type="math/tex">m</script></th>
+      <th style="text-align: center"><script type="math/tex">\Delta</script></th>
+      <th style="text-align: center">Optimal value</th>
+      <th style="text-align: center">Solution</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n6}</script></td>
+      <td style="text-align: center">6</td>
+      <td style="text-align: center">1</td>
+      <td style="text-align: center">5</td>
+      <td style="text-align: center">4</td>
+      <td style="text-align: center">2</td>
+      <td style="text-align: center">6</td>
+      <td style="text-align: center">12</td>
+      <td style="text-align: center"><img src="/images/flight-route-optimizer/n6_cost=12.png" alt="" /></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n20_1}</script></td>
+      <td style="text-align: center">20</td>
+      <td style="text-align: center">19</td>
+      <td style="text-align: center">10</td>
+      <td style="text-align: center">8</td>
+      <td style="text-align: center">3</td>
+      <td style="text-align: center">50</td>
+      <td style="text-align: center">91</td>
+      <td style="text-align: center"><img src="/images/flight-route-optimizer/n20_1_cost=91.png" alt="" /></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n20_2}</script></td>
+      <td style="text-align: center">20</td>
+      <td style="text-align: center">1</td>
+      <td style="text-align: center">10</td>
+      <td style="text-align: center">8</td>
+      <td style="text-align: center">3</td>
+      <td style="text-align: center">50</td>
+      <td style="text-align: center">79</td>
+      <td style="text-align: center"><img src="/images/flight-route-optimizer/n20_2_cost=79.png" alt="" /></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n20_3}</script></td>
+      <td style="text-align: center">20</td>
+      <td style="text-align: center">1</td>
+      <td style="text-align: center">10</td>
+      <td style="text-align: center">8</td>
+      <td style="text-align: center">3</td>
+      <td style="text-align: center">25</td>
+      <td style="text-align: center">90</td>
+      <td style="text-align: center"><img src="/images/flight-route-optimizer/n20_3_cost=90.png" alt="" /></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n20_4}</script></td>
+      <td style="text-align: center">20</td>
+      <td style="text-align: center">1</td>
+      <td style="text-align: center">15</td>
+      <td style="text-align: center">8</td>
+      <td style="text-align: center">3</td>
+      <td style="text-align: center">40</td>
+      <td style="text-align: center">96</td>
+      <td style="text-align: center"><img src="/images/flight-route-optimizer/n20_4_cost=96.png" alt="" /></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n30}</script></td>
+      <td style="text-align: center">30</td>
+      <td style="text-align: center">19</td>
+      <td style="text-align: center">10</td>
+      <td style="text-align: center">14</td>
+      <td style="text-align: center">3</td>
+      <td style="text-align: center">18</td>
+      <td style="text-align: center">130</td>
+      <td style="text-align: center"><img src="/images/flight-route-optimizer/n30_cost=130.png" alt="" /></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n40}</script></td>
+      <td style="text-align: center">40</td>
+      <td style="text-align: center">27</td>
+      <td style="text-align: center">8</td>
+      <td style="text-align: center">14</td>
+      <td style="text-align: center">2</td>
+      <td style="text-align: center">26</td>
+      <td style="text-align: center">114</td>
+      <td style="text-align: center"><img src="/images/flight-route-optimizer/n40_cost=114.png" alt="" /></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n50}</script></td>
+      <td style="text-align: center">50</td>
+      <td style="text-align: center">49</td>
+      <td style="text-align: center">34</td>
+      <td style="text-align: center">16</td>
+      <td style="text-align: center">4</td>
+      <td style="text-align: center">28</td>
+      <td style="text-align: center">168</td>
+      <td style="text-align: center"><img src="/images/flight-route-optimizer/n50_cost=168.png" alt="" /></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n70}</script></td>
+      <td style="text-align: center">70</td>
+      <td style="text-align: center">47</td>
+      <td style="text-align: center">23</td>
+      <td style="text-align: center">22</td>
+      <td style="text-align: center">16</td>
+      <td style="text-align: center">35</td>
+      <td style="text-align: center">235</td>
+      <td style="text-align: center"><img src="/images/flight-route-optimizer/n70_cost=235.png" alt="" /></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n80}</script></td>
+      <td style="text-align: center">80</td>
+      <td style="text-align: center">46</td>
+      <td style="text-align: center">32</td>
+      <td style="text-align: center">35</td>
+      <td style="text-align: center">9</td>
+      <td style="text-align: center">31</td>
+      <td style="text-align: center">407</td>
+      <td style="text-align: center"><img src="/images/flight-route-optimizer/n80_cost=407.png" alt="" /></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n90}</script></td>
+      <td style="text-align: center">90</td>
+      <td style="text-align: center">1</td>
+      <td style="text-align: center">90</td>
+      <td style="text-align: center">45</td>
+      <td style="text-align: center">7</td>
+      <td style="text-align: center">50</td>
+      <td style="text-align: center">616</td>
+      <td style="text-align: center"><img src="/images/flight-route-optimizer/n90_cost=616.png" alt="" /></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n100_1}</script></td>
+      <td style="text-align: center">100</td>
+      <td style="text-align: center">1</td>
+      <td style="text-align: center">100</td>
+      <td style="text-align: center">50</td>
+      <td style="text-align: center">11</td>
+      <td style="text-align: center">40</td>
+      <td style="text-align: center">665</td>
+      <td style="text-align: center"><img src="/images/flight-route-optimizer/n100_1_cost=665.png" alt="" /></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n100_2}</script></td>
+      <td style="text-align: center">100</td>
+      <td style="text-align: center">1</td>
+      <td style="text-align: center">100</td>
+      <td style="text-align: center">50</td>
+      <td style="text-align: center">11</td>
+      <td style="text-align: center">40</td>
+      <td style="text-align: center">559</td>
+      <td style="text-align: center"><img src="/images/flight-route-optimizer/n100_2_cost=559.png" alt="" /></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n120}</script></td>
+      <td style="text-align: center">120</td>
+      <td style="text-align: center">1</td>
+      <td style="text-align: center">120</td>
+      <td style="text-align: center">40</td>
+      <td style="text-align: center">11</td>
+      <td style="text-align: center">30</td>
+      <td style="text-align: center">447</td>
+      <td style="text-align: center"><img src="/images/flight-route-optimizer/n120_cost=447.png" alt="" /></td>
+    </tr>
+    <tr>
+      <td style="text-align: center"><script type="math/tex">\texttt{n150}</script></td>
+      <td style="text-align: center">150</td>
+      <td style="text-align: center">1</td>
+      <td style="text-align: center">150</td>
+      <td style="text-align: center">50</td>
+      <td style="text-align: center">11</td>
+      <td style="text-align: center">25</td>
+      <td style="text-align: center">449</td>
+      <td style="text-align: center"><img src="/images/flight-route-optimizer/n150_cost=449.png" alt="" /></td>
+    </tr>
+  </tbody>
+</table>
+        </main>
+        <nav class="d-none d-xl-block col-xl-3 toc-nav" id="toc-nav">
+            <h5 class="toc-nav-title">Contents</h5>
+            <ul class="nav">
+  <li><a href="#introduction" class="nav-link">Introduction</a></li>
+  <li><a href="#notations" class="nav-link">Notations</a>
+    <ul>
+      <li><a href="#parameters" class="nav-link">Parameters</a></li>
+      <li><a href="#decision-variables" class="nav-link">Decision variables</a></li>
+    </ul>
+  </li>
+  <li><a href="#mathematical-modeling" class="nav-link">Mathematical modeling</a>
+    <ul>
+      <li><a href="#optimization-graph" class="nav-link">Optimization graph</a></li>
+      <li><a href="#objective" class="nav-link">Objective</a></li>
+      <li><a href="#constraints" class="nav-link">Constraints</a></li>
+      <li><a href="#connectivity-constraint" class="nav-link">Connectivity constraint</a></li>
+    </ul>
+  </li>
+  <li><a href="#method-1-order-of-visit" class="nav-link">Method 1: order of visit</a></li>
+  <li><a href="#method-2-single-flow" class="nav-link">Method 2: single flow</a>
+    <ul>
+      <li><a href="#benefit" class="nav-link">Benefit</a></li>
+    </ul>
+  </li>
+  <li><a href="#method-3-standard-constraint-generation" class="nav-link">Method 3: standard constraint generation</a>
+    <ul>
+      <li><a href="#master-problem" class="nav-link">Master problem</a></li>
+      <li><a href="#subtour-detection-subproblem" class="nav-link">Subtour detection subproblem</a></li>
+    </ul>
+  </li>
+  <li><a href="#method-4-advanced-constraint-generation" class="nav-link">Method 4: advanced constraint generation</a>
+    <ul>
+      <li><a href="#master-problem-1" class="nav-link">Master problem</a></li>
+      <li><a href="#subtour-detection-subproblem-1" class="nav-link">Subtour detection subproblem</a></li>
+    </ul>
+  </li>
+  <li><a href="#performance" class="nav-link">Performance</a></li>
+  <li><a href="#instances" class="nav-link">Instances</a></li>
+</ul>
+        </nav>
+    </div>
+  		</div>
+	  </div>
+	  <footer class="site-footer text-center">
+  <hr>
+  <a href="https://github.com/antcrepin/antcrepin.github.io"><i class="fab fa-github"></i></a>
+  <span class="site-footer-credits">Hosted by <a href="https://pages.github.com">GitHub Pages</a></span>
+  <div>&copy; Antoine Crépin, 2020</div>
+</footer>
+	</div>
+<!-- jQuery: necessary for Bootstrap's JavaScript plugins -->
+<!-- Popper.js: required for Bootstrap tooltips -->
+<!-- Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+</body>
+<link rel="shortcut icon" type="image/svg" href="/favicon.svg">
+</html>
